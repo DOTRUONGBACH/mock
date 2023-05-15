@@ -39,5 +39,10 @@ type Query {
 }
 
 type Mutation {
-    newUser(input: NewUserInput!): User!
+    signup(email: String!, password: String!): SignupResponse!
+}
+type SignupResponse {
+  success: Boolean!
+  token: String
+  message: String!
 }

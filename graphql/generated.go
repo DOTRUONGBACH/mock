@@ -50,7 +50,7 @@ type DirectiveRoot struct {
 
 type ComplexityRoot struct {
 	Mutation struct {
-		NewUser func(childComplexity int, input ent.NewUserInput) int
+		Signup func(childComplexity int, email string, password string) int
 	}
 
 	PageInfo struct {
@@ -62,6 +62,12 @@ type ComplexityRoot struct {
 
 	Query struct {
 		Users func(childComplexity int, after *entgql.Cursor[uuid.UUID], first *int, before *entgql.Cursor[uuid.UUID], last *int, orderBy *ent.UserOrder) int
+	}
+
+	SignupResponse struct {
+		Message func(childComplexity int) int
+		Success func(childComplexity int) int
+		Token   func(childComplexity int) int
 	}
 
 	User struct {
@@ -85,7 +91,7 @@ type ComplexityRoot struct {
 }
 
 type MutationResolver interface {
-	NewUser(ctx context.Context, input ent.NewUserInput) (*ent.User, error)
+	Signup(ctx context.Context, email string, password string) (*ent.SignupResponse, error)
 }
 type QueryResolver interface {
 	Users(ctx context.Context, after *entgql.Cursor[uuid.UUID], first *int, before *entgql.Cursor[uuid.UUID], last *int, orderBy *ent.UserOrder) (*ent.UserConnection, error)
@@ -109,17 +115,17 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 	_ = ec
 	switch typeName + "." + field {
 
-	case "Mutation.newUser":
-		if e.complexity.Mutation.NewUser == nil {
+	case "Mutation.signup":
+		if e.complexity.Mutation.Signup == nil {
 			break
 		}
 
-		args, err := ec.field_Mutation_newUser_args(context.TODO(), rawArgs)
+		args, err := ec.field_Mutation_signup_args(context.TODO(), rawArgs)
 		if err != nil {
 			return 0, false
 		}
 
-		return e.complexity.Mutation.NewUser(childComplexity, args["input"].(ent.NewUserInput)), true
+		return e.complexity.Mutation.Signup(childComplexity, args["email"].(string), args["password"].(string)), true
 
 	case "PageInfo.endCursor":
 		if e.complexity.PageInfo.EndCursor == nil {
@@ -160,6 +166,27 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Query.Users(childComplexity, args["after"].(*entgql.Cursor[uuid.UUID]), args["first"].(*int), args["before"].(*entgql.Cursor[uuid.UUID]), args["last"].(*int), args["orderBy"].(*ent.UserOrder)), true
+
+	case "SignupResponse.message":
+		if e.complexity.SignupResponse.Message == nil {
+			break
+		}
+
+		return e.complexity.SignupResponse.Message(childComplexity), true
+
+	case "SignupResponse.success":
+		if e.complexity.SignupResponse.Success == nil {
+			break
+		}
+
+		return e.complexity.SignupResponse.Success(childComplexity), true
+
+	case "SignupResponse.token":
+		if e.complexity.SignupResponse.Token == nil {
+			break
+		}
+
+		return e.complexity.SignupResponse.Token(childComplexity), true
 
 	case "User.createdAt":
 		if e.complexity.User.CreatedAt == nil {
@@ -301,7 +328,7 @@ func (ec *executionContext) introspectType(name string) (*introspection.Type, er
 }
 
 var sources = []*ast.Source{
-	{Name: "schema/common.graphql", Input: `directive @goField(forceResolver: Boolean, name: String) on FIELD_DEFINITION | INPUT_FIELD_DEFINITION
+	{Name: "../schema/common.graphql", Input: `directive @goField(forceResolver: Boolean, name: String) on FIELD_DEFINITION | INPUT_FIELD_DEFINITION
 directive @validation(constraints: String!) on INPUT_FIELD_DEFINITION | ARGUMENT_DEFINITION
 
 scalar Time
@@ -319,7 +346,7 @@ type PageInfo {
   startCursor: Cursor
   endCursor: Cursor
 }`, BuiltIn: false},
-	{Name: "schema/user.graphql", Input: `type User {
+	{Name: "../schema/user.graphql", Input: `type User {
     id: ID!
     email: String!
     password: String!
@@ -360,7 +387,12 @@ type Query {
 }
 
 type Mutation {
-    newUser(input: NewUserInput!): User!
+    signup(email: String!, password: String!): SignupResponse!
+}
+type SignupResponse {
+  success: Boolean!
+  token: String
+  message: String!
 }`, BuiltIn: false},
 }
 var parsedSchema = gqlparser.MustLoadSchema(sources...)
@@ -384,18 +416,27 @@ func (ec *executionContext) dir_validation_args(ctx context.Context, rawArgs map
 	return args, nil
 }
 
-func (ec *executionContext) field_Mutation_newUser_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+func (ec *executionContext) field_Mutation_signup_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
-	var arg0 ent.NewUserInput
-	if tmp, ok := rawArgs["input"]; ok {
-		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
-		arg0, err = ec.unmarshalNNewUserInput2mockᚑprojectᚋentᚐNewUserInput(ctx, tmp)
+	var arg0 string
+	if tmp, ok := rawArgs["email"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("email"))
+		arg0, err = ec.unmarshalNString2string(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
 	}
-	args["input"] = arg0
+	args["email"] = arg0
+	var arg1 string
+	if tmp, ok := rawArgs["password"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("password"))
+		arg1, err = ec.unmarshalNString2string(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["password"] = arg1
 	return args, nil
 }
 
@@ -503,8 +544,8 @@ func (ec *executionContext) field___Type_fields_args(ctx context.Context, rawArg
 
 // region    **************************** field.gotpl *****************************
 
-func (ec *executionContext) _Mutation_newUser(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Mutation_newUser(ctx, field)
+func (ec *executionContext) _Mutation_signup(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_signup(ctx, field)
 	if err != nil {
 		return graphql.Null
 	}
@@ -517,7 +558,7 @@ func (ec *executionContext) _Mutation_newUser(ctx context.Context, field graphql
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Mutation().NewUser(rctx, fc.Args["input"].(ent.NewUserInput))
+		return ec.resolvers.Mutation().Signup(rctx, fc.Args["email"].(string), fc.Args["password"].(string))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -529,12 +570,12 @@ func (ec *executionContext) _Mutation_newUser(ctx context.Context, field graphql
 		}
 		return graphql.Null
 	}
-	res := resTmp.(*ent.User)
+	res := resTmp.(*ent.SignupResponse)
 	fc.Result = res
-	return ec.marshalNUser2ᚖmockᚑprojectᚋentᚐUser(ctx, field.Selections, res)
+	return ec.marshalNSignupResponse2ᚖmockᚑprojectᚋentᚐSignupResponse(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) fieldContext_Mutation_newUser(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+func (ec *executionContext) fieldContext_Mutation_signup(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "Mutation",
 		Field:      field,
@@ -542,18 +583,14 @@ func (ec *executionContext) fieldContext_Mutation_newUser(ctx context.Context, f
 		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			switch field.Name {
-			case "id":
-				return ec.fieldContext_User_id(ctx, field)
-			case "email":
-				return ec.fieldContext_User_email(ctx, field)
-			case "password":
-				return ec.fieldContext_User_password(ctx, field)
-			case "createdAt":
-				return ec.fieldContext_User_createdAt(ctx, field)
-			case "updatedAt":
-				return ec.fieldContext_User_updatedAt(ctx, field)
+			case "success":
+				return ec.fieldContext_SignupResponse_success(ctx, field)
+			case "token":
+				return ec.fieldContext_SignupResponse_token(ctx, field)
+			case "message":
+				return ec.fieldContext_SignupResponse_message(ctx, field)
 			}
-			return nil, fmt.Errorf("no field named %q was found under type User", field.Name)
+			return nil, fmt.Errorf("no field named %q was found under type SignupResponse", field.Name)
 		},
 	}
 	defer func() {
@@ -563,7 +600,7 @@ func (ec *executionContext) fieldContext_Mutation_newUser(ctx context.Context, f
 		}
 	}()
 	ctx = graphql.WithFieldContext(ctx, fc)
-	if fc.Args, err = ec.field_Mutation_newUser_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+	if fc.Args, err = ec.field_Mutation_signup_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return
 	}
@@ -927,6 +964,135 @@ func (ec *executionContext) fieldContext_Query___schema(ctx context.Context, fie
 				return ec.fieldContext___Schema_directives(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type __Schema", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _SignupResponse_success(ctx context.Context, field graphql.CollectedField, obj *ent.SignupResponse) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_SignupResponse_success(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Success, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(bool)
+	fc.Result = res
+	return ec.marshalNBoolean2bool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_SignupResponse_success(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SignupResponse",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _SignupResponse_token(ctx context.Context, field graphql.CollectedField, obj *ent.SignupResponse) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_SignupResponse_token(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Token, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_SignupResponse_token(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SignupResponse",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _SignupResponse_message(ctx context.Context, field graphql.CollectedField, obj *ent.SignupResponse) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_SignupResponse_message(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Message, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_SignupResponse_message(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SignupResponse",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
 		},
 	}
 	return fc, nil
@@ -3168,16 +3334,22 @@ func (ec *executionContext) unmarshalInputNewUserInput(ctx context.Context, obj 
 		asMap[k] = v
 	}
 
-	for k, v := range asMap {
+	fieldsInOrder := [...]string{"email"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
 		switch k {
 		case "email":
 			var err error
 
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("email"))
-			it.Email, err = ec.unmarshalNString2string(ctx, v)
+			data, err := ec.unmarshalNString2string(ctx, v)
 			if err != nil {
 				return it, err
 			}
+			it.Email = data
 		}
 	}
 
@@ -3191,24 +3363,31 @@ func (ec *executionContext) unmarshalInputUserOrder(ctx context.Context, obj int
 		asMap[k] = v
 	}
 
-	for k, v := range asMap {
+	fieldsInOrder := [...]string{"direction", "field"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
 		switch k {
 		case "direction":
 			var err error
 
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("direction"))
-			it.Direction, err = ec.unmarshalNOrderDirection2entgoᚗioᚋcontribᚋentgqlᚐOrderDirection(ctx, v)
+			data, err := ec.unmarshalNOrderDirection2entgoᚗioᚋcontribᚋentgqlᚐOrderDirection(ctx, v)
 			if err != nil {
 				return it, err
 			}
+			it.Direction = data
 		case "field":
 			var err error
 
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("field"))
-			it.Field, err = ec.unmarshalOUserOrderField2ᚖmockᚑprojectᚋentᚐUserOrderField(ctx, v)
+			data, err := ec.unmarshalOUserOrderField2ᚖmockᚑprojectᚋentᚐUserOrderField(ctx, v)
 			if err != nil {
 				return it, err
 			}
+			it.Field = data
 		}
 	}
 
@@ -3242,10 +3421,10 @@ func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet)
 		switch field.Name {
 		case "__typename":
 			out.Values[i] = graphql.MarshalString("Mutation")
-		case "newUser":
+		case "signup":
 
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
-				return ec._Mutation_newUser(ctx, field)
+				return ec._Mutation_signup(ctx, field)
 			})
 
 			if out.Values[i] == graphql.Null {
@@ -3359,6 +3538,45 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 				return ec._Query___schema(ctx, field)
 			})
 
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var signupResponseImplementors = []string{"SignupResponse"}
+
+func (ec *executionContext) _SignupResponse(ctx context.Context, sel ast.SelectionSet, obj *ent.SignupResponse) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, signupResponseImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("SignupResponse")
+		case "success":
+
+			out.Values[i] = ec._SignupResponse_success(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "token":
+
+			out.Values[i] = ec._SignupResponse_token(ctx, field, obj)
+
+		case "message":
+
+			out.Values[i] = ec._SignupResponse_message(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -3877,11 +4095,6 @@ func (ec *executionContext) marshalNInt2int(ctx context.Context, sel ast.Selecti
 	return res
 }
 
-func (ec *executionContext) unmarshalNNewUserInput2mockᚑprojectᚋentᚐNewUserInput(ctx context.Context, v interface{}) (ent.NewUserInput, error) {
-	res, err := ec.unmarshalInputNewUserInput(ctx, v)
-	return res, graphql.ErrorOnPath(ctx, err)
-}
-
 func (ec *executionContext) unmarshalNOrderDirection2entgoᚗioᚋcontribᚋentgqlᚐOrderDirection(ctx context.Context, v interface{}) (entgql.OrderDirection, error) {
 	var res entgql.OrderDirection
 	err := res.UnmarshalGQL(v)
@@ -3894,6 +4107,20 @@ func (ec *executionContext) marshalNOrderDirection2entgoᚗioᚋcontribᚋentgql
 
 func (ec *executionContext) marshalNPageInfo2entgoᚗioᚋcontribᚋentgqlᚐPageInfo(ctx context.Context, sel ast.SelectionSet, v entgql.PageInfo[uuid.UUID]) graphql.Marshaler {
 	return ec._PageInfo(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNSignupResponse2mockᚑprojectᚋentᚐSignupResponse(ctx context.Context, sel ast.SelectionSet, v ent.SignupResponse) graphql.Marshaler {
+	return ec._SignupResponse(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNSignupResponse2ᚖmockᚑprojectᚋentᚐSignupResponse(ctx context.Context, sel ast.SelectionSet, v *ent.SignupResponse) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._SignupResponse(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalNString2string(ctx context.Context, v interface{}) (string, error) {
@@ -3909,20 +4136,6 @@ func (ec *executionContext) marshalNString2string(ctx context.Context, sel ast.S
 		}
 	}
 	return res
-}
-
-func (ec *executionContext) marshalNUser2mockᚑprojectᚋentᚐUser(ctx context.Context, sel ast.SelectionSet, v ent.User) graphql.Marshaler {
-	return ec._User(ctx, sel, &v)
-}
-
-func (ec *executionContext) marshalNUser2ᚖmockᚑprojectᚋentᚐUser(ctx context.Context, sel ast.SelectionSet, v *ent.User) graphql.Marshaler {
-	if v == nil {
-		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
-			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
-		}
-		return graphql.Null
-	}
-	return ec._User(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalNUserConnection2mockᚑprojectᚋentᚐUserConnection(ctx context.Context, sel ast.SelectionSet, v ent.UserConnection) graphql.Marshaler {

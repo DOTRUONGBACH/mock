@@ -5,3 +5,9 @@ package ent
 type NewUserInput struct {
 	Email string `json:"email"`
 }
+
+type SignupResponse struct {
+	Success bool    `json:"success"`
+	Token   *string `json:"token,omitempty"`
+	Message string  `json:"message"`
+}
