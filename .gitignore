@@ -106,11 +106,9 @@ Temporary Items
 # Custom
 swagger.json
 swagger.yaml
-server
 .env
 coverage.html
 
 # Jetbrain
 *.idea
 ##
-server
